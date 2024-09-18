@@ -69,16 +69,21 @@ func Server(pro chan Pac){
 	fmt.Println("server got message")
 	var syn = rand.IntN(100)+100
 
+	connectionEstablished := false
 
-
-	pro <- Pac{temp.sec+1, syn, temp.data}
-
-	temp2 := <- pro
-
-	if temp2.ack == syn+1 && temp2.sec == temp.ack+1{
-
+	for connectionEstablished == false{
+		fmt.Println("connectLoop begin")
+		pro <- Pac{temp.sec+1, syn, temp.data}
+		fmt.Println("connectLoop halfway")
+		time.Sleep(1 * time.Second)
+		temp2 := <- pro
+		fmt.Println("connectLoop ran")
+		if temp2.ack == syn+1 && temp2.sec == temp.sec+1{
+			connectionEstablished = true
+		}
 	}
 
+	fmt.Println("Connection fully established");
 
 	for {
 
