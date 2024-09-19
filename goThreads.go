@@ -15,8 +15,18 @@ func main() {
 
 	go Client(pro)
 
+	go Resender(pro)
+
 	for {
 
+	}
+}
+
+func Resender(pro chan Pac){
+	for{
+		var tmp = <-pro
+
+		pro <- tmp
 	}
 }
 
@@ -25,14 +35,21 @@ func Client(pro chan Pac) {
 	var ack Pac = Pac{-2, -2, ""}
 
 	for ack == (Pac{-2, -2, ""}) {
+		fmt.Println("Pac send")
 		pro <- Pac{-1, syn, "ABC"}
 		time.Sleep(1 * time.Second)
 		go ClientCheck(&ack, syn, pro)
+		fmt.Println("sub routine activated")
 		time.Sleep(5 * time.Millisecond)
 		if ack.ack != syn+1 {
+			fmt.Println("message not approved")
 			ack = Pac{-2, -2, ""}
 		}
 	}
+
+	time.Sleep(500*time.Millisecond)
+
+	fmt.Println("client thinks connection established")
 
 	pro <- Pac{ack.sec + 1, ack.ack, "ABC"}
 
@@ -48,6 +65,17 @@ func Client(pro chan Pac) {
 			var tmp1 = <-pro
 
 			var tmp2 = <-pro
+
+			if tmp0.sec > tmp1.sec {
+				var tmp = tmp0
+				tmp0 = tmp1
+				tmp1 = tmp
+			}
+			if tmp1.sec > tmp2.sec {
+				var tmp = tmp1
+				tmp1 = tmp2
+				tmp2 = tmp
+			}
 
 			pro <- Pac{tmp0.sec + 1, -1, ""}
 
@@ -98,10 +126,13 @@ func Server(pro chan Pac) {
 	connectionEstablished := false
 
 	for connectionEstablished == false {
+		fmt.Println("Server, sends pac")
 		pro <- Pac{temp.sec + 1, syn, temp.data}
-		time.Sleep(1 * time.Second)
+		time.Sleep(200 * time.Millisecond)
 		temp2 := <-pro
+		fmt.Println("Server, recieve pac")
 		if temp2.ack == syn+1 && temp2.sec == temp.sec+1 {
+			fmt.Println("Server, sub activates")
 			connectionEstablished = true
 		}
 	}
@@ -123,8 +154,6 @@ func Server(pro chan Pac) {
 	var serverReadyToShutDown bool = false
 
 	for {
-
-
 		if seq[0] != -1 {
 			pro <- Pac{-1, seq[0], message[0]}
 		}
@@ -137,9 +166,10 @@ func Server(pro chan Pac) {
 			pro <- Pac{-1, seq[2], message[2]}
 		}
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 
-		if seq[0] != -1 && seq[1] != -1 && seq[2] != -1 {
+		if seq[0] != -1 && seq[1] != -1 && seq[2] != -1 { //Checking to see if we recieve all acknoladgements.
+			fmt.Printf("seq[0] = %d. seq[0] = %d. seq[0] = %d.\n",seq[0],seq[1],seq[2])
 			var tmp0 = <-pro
 
 			if tmp0.ack == seq[0]+1 {
@@ -176,6 +206,8 @@ func Server(pro chan Pac) {
 		}
 
 		if seq[0] == -1 && seq[1] == -1 && seq[2] == -1 {
+			fmt.Println("Server, ack for message recieved")
+
 			if serverReadyToShutDown == false {
 				pro <- Pac{-1, 1000, ""}
 
