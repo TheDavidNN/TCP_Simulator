@@ -25,9 +25,7 @@ func Client(pro chan Pac) {
 	var ack Pac = Pac{-2, -2, ""}
 
 	for ack == (Pac{-2, -2, ""}) {
-		fmt.Println("starts")
 		pro <- Pac{-1, syn, "ABC"}
-		fmt.Println("b")
 		time.Sleep(1 * time.Second)
 		go ClientCheck(&ack, syn, pro)
 		time.Sleep(5 * time.Millisecond)
@@ -35,46 +33,45 @@ func Client(pro chan Pac) {
 			ack = Pac{-2, -2, ""}
 		}
 	}
-	fmt.Println("Made it out")
-	fmt.Printf("Ack: ack %d, sec %d, data %s \n", ack.ack, ack.sec, ack.data)
 
 	pro <- Pac{ack.sec + 1, ack.ack, "ABC"}
 
 	var serverDown bool = false
 
+	var messageRecieved bool = false
 
 	for {
+		if messageRecieved == false {
 
-		var tmp0 = <- pro
+			var tmp0 = <-pro
 
-		var tmp1 = <- pro
+			var tmp1 = <-pro
 
-		var tmp2 = <- pro
+			var tmp2 = <-pro
 
+			pro <- Pac{tmp0.sec + 1, -1, ""}
 
+			pro <- Pac{tmp1.sec + 1, -1, ""}
 
-		pro <- Pac{tmp0.sec+1,-1,""}
+			pro <- Pac{tmp2.sec + 1, -1, ""}
 
-		pro <- Pac{tmp1.sec+1,-1,""}
-
-		pro <- Pac{tmp2.sec+1,-1,""}
-
-		fmt.Printf("The message was: %s \n", tmp0.data+tmp1.data+tmp2.data)
-
-		if serverDown == false{
-		var end0 = <- pro
-
-		pro <- Pac{end0.sec+1,-1,""}
-		fmt.Println("Server_shutdown")
-		serverDown = true
+			fmt.Printf("The message was: %s \n", tmp0.data+tmp1.data+tmp2.data)
+			messageRecieved = true
 		}
 
+		if serverDown == false {
+			var end0 = <-pro
+			pro <- Pac{end0.sec + 1, -1, ""}
+			serverDown = true
+		}
+
+		time.Sleep(1 * time.Second)
 
 		//2000 is shutdown for client
 
 		pro <- Pac{-1, 2000, ""}
 
-		var end1 = <- pro
+		var end1 = <-pro
 
 		if end1.ack == 2001 {
 			break
@@ -88,7 +85,6 @@ func ClientCheck(ackPointer *Pac, syn int, pro chan Pac) {
 	temp := <-pro //Kill package: Pac{-1,-1,""}
 
 	if temp.ack != -1 && temp.sec != -1 || syn != temp.sec { //Kill package actiaved
-		fmt.Println("Might run")
 		*ackPointer = temp
 	}
 
@@ -97,18 +93,14 @@ func ClientCheck(ackPointer *Pac, syn int, pro chan Pac) {
 func Server(pro chan Pac) {
 
 	temp := <-pro
-	fmt.Println("server got message")
 	var syn = rand.IntN(100) + 100
 
 	connectionEstablished := false
 
 	for connectionEstablished == false {
-		fmt.Println("connectLoop begin")
 		pro <- Pac{temp.sec + 1, syn, temp.data}
-		fmt.Println("connectLoop halfway")
 		time.Sleep(1 * time.Second)
 		temp2 := <-pro
-		fmt.Println("connectLoop ran")
 		if temp2.ack == syn+1 && temp2.sec == temp.sec+1 {
 			connectionEstablished = true
 		}
@@ -131,6 +123,7 @@ func Server(pro chan Pac) {
 	var serverReadyToShutDown bool = false
 
 	for {
+
 
 		if seq[0] != -1 {
 			pro <- Pac{-1, seq[0], message[0]}
@@ -183,30 +176,20 @@ func Server(pro chan Pac) {
 		}
 
 		if seq[0] == -1 && seq[1] == -1 && seq[2] == -1 {
-			if serverReadyToShutDown == false{
-			pro <- Pac{-1, 1000, ""}
-
-			var end0 = <- pro
-
-			if end0.ack == 1001{
-				var end1 = <- pro
-				pro <- Pac{end1.sec+1, -1, ""}
-				serverReadyToShutDown = true
-				fmt.Println("server_ready")
-			} else {
+			if serverReadyToShutDown == false {
 				pro <- Pac{-1, 1000, ""}
+
+				var end0 = <-pro
+
+				if end0.ack == 1001 {
+					var end1 = <-pro
+					pro <- Pac{end1.sec + 1, -1, ""}
+					break
+				} else {
+					pro <- Pac{-1, 1000, ""}
+				}
 			}
-		} else{
-			var end2 = <- pro
-
-			pro <- Pac{end2.sec+1, -1, ""}
-
-			break
-
 		}
-
-		}
-
 	}
 	fmt.Println("server has shutdown")
 
