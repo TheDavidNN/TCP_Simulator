@@ -25,8 +25,9 @@ func main() {
 func Resender(pro chan Pac){
 	for{
 		var tmp = <-pro
-
-		pro <- tmp
+		if rand.IntN(100) >=20 {
+			pro <- tmp
+		}
 	}
 }
 
@@ -34,24 +35,33 @@ func Client(pro chan Pac) {
 	var syn = rand.IntN(100)
 	var ack Pac = Pac{-2, -2, ""}
 
+	var tmp0 Pac
+
+
 	for ack == (Pac{-2, -2, ""}) {
 		fmt.Println("Pac send")
 		pro <- Pac{-1, syn, "ABC"}
-		time.Sleep(1 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 		go ClientCheck(&ack, syn, pro)
 		fmt.Println("sub routine activated")
-		time.Sleep(5 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 		if ack.ack != syn+1 {
 			fmt.Println("message not approved")
 			ack = Pac{-2, -2, ""}
+		} else{
+			pro <- Pac{ack.sec + 1, ack.ack, "ABC"}
+			time.Sleep(1*time.Second)
+			tmp0 = <-pro
+			if tmp0.ack == syn+1{
+				ack = Pac{-2, -2, ""}
+			}
 		}
 	}
 
-	time.Sleep(500*time.Millisecond)
+	time.Sleep(1*time.Second)
 
 	fmt.Println("client thinks connection established")
 
-	pro <- Pac{ack.sec + 1, ack.ack, "ABC"}
 
 	var serverDown bool = false
 
@@ -60,7 +70,7 @@ func Client(pro chan Pac) {
 	for {
 		if messageRecieved == false {
 
-			var tmp0 = <-pro
+			tmp0 = <-pro
 
 			var tmp1 = <-pro
 
