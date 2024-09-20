@@ -25,121 +25,94 @@ func main() {
 func Resender(pro chan Pac) {
 	for {
 		var tmp = <-pro
-		if rand.IntN(100) >= 50 {
+		if rand.IntN(100) >= 95 {
 			pro <- tmp
 		}
 	}
 }
 
 func Client(pro chan Pac) {
-	var syn = rand.IntN(100)
-	var ack Pac = Pac{-2, -2, ""}
+	var seq = rand.IntN(100)
 
-	var tmp0 Pac
+	var synAck Pac = Pac{-1, -1}
 
-	/*
-		fmt.Println("Pac send")
-			pro <- Pac{-1, syn, "ABC"}
-			time.Sleep(500 * time.Millisecond)
-			go ClientCheck(&ack, syn, pro)
-			fmt.Println("sub routine activated")
-			time.Sleep(500 * time.Millisecond)
-			if ack.ack != syn+1 {
-				fmt.Println("message not approved")
-				ack = Pac{-2, -2, ""}
-	*/
+	for synAck.ack == -1 { //Send syn and get synack
+		sendSyn(pro, seq)
 
-	var sendFirstMsg bool = false
+		go getSynAck(pro, &synAck, seq)
 
-	for ack == (Pac{-2, -2, ""}) {
+		time.Sleep(300*time.Millisecond)
+	} //Now we have recieved a acknoladgement from the server.
 
-		if !sendFirstMsg {
-			fmt.Println("client, send message")
-			ack = SendMessageRecieveAnswer(pro, Pac{-1, syn, "ABC"}, syn+1, 800, &sendFirstMsg)
-			fmt.Println("client, recieve message")
-		}
-
-		pro <- Pac{ack.sec + 1, ack.ack, "ABC"}
-		time.Sleep(1 * time.Second)
-		tmp0 = <-pro
-		if tmp0.ack == syn+1 {
-			ack = Pac{-2, -2, ""}
-		}
-	}
-
-	time.Sleep(1 * time.Second)
-
-	fmt.Println("client thinks connection established")
-
-}
-
-func CheckIfMessage(pro chan Pac, check *bool) {
-	tmp := <-pro
-
-	pro <- tmp
-
-	*check = true
-}
-
-func SendMessage(pro chan Pac, packag Pac) {
-	pro <- packag
-}
-
-func CheckMessage(pro chan Pac, packag Pac, exspectedAck int) bool {
-	if packag.ack == exspectedAck {
-		return true
-	}
-	return false
-}
-
-func SendMessageRecieveAnswer(pro chan Pac, packag Pac, exspectedAck int, tim int, noLongerDoThis *bool) Pac {
+	Ack := Pac{synAck.seq+1,synAck.ack}
 
 	for {
-		SendMessage(pro, packag)
-		fmt.Printf("Sending message packag: sec: %d\n", packag.sec)
-
-		time.Sleep(time.Duration(tim) * time.Millisecond)
-		var boo bool = false
-		go CheckIfMessage(pro, &boo)
-		time.Sleep(100 * time.Millisecond)
-		var tmp Pac = Pac{-1, -1, ""}
-		if boo {
-			tmp = <-pro
-			fmt.Printf("recieve message %d\n", tmp.ack)
-		}
-		if CheckMessage(pro, tmp, exspectedAck) {
-			*noLongerDoThis = true
-			return tmp
-		}
+		sendAck(pro,Ack)
+		fmt.Println("Client believes a connection has been established")
+		getSynAck(pro,&synAck,seq)
+		time.Sleep(300*time.Millisecond)
 	}
-	return Pac{-1, -1, ""}
 
+}
+
+func sendAck(pro chan Pac, Ack Pac){
+	fmt.Println("Client, sendAck")
+	pro <- Ack //Sending ack
+
+	time.Sleep(500 * time.Millisecond)
+}
+
+func getSynAck(pro chan Pac, synAck *Pac, seq int) {
+	fmt.Println("Client, getSynAck")
+	var recieve Pac = Pac{-1, -1}
+
+	recieve = <-pro //Getting syn-ack
+
+	if recieve.ack == seq+1 {
+		*synAck = recieve
+	}
+}
+
+func sendSyn(pro chan Pac, seq int) {
+	fmt.Println("Client, sendSyn")
+	pro <- Pac{-1, seq} //Sending syn
+
+	time.Sleep(500 * time.Millisecond)
 }
 
 func Server(pro chan Pac) {
+	var seq = rand.IntN(100) + 100
 
-	temp := <-pro
-	var syn = rand.IntN(100) + 100
+	firstMsg := <-pro
 
-	connectionEstablished := false
+	Ack := Pac{-1,-1}
 
-	var t bool = false
+	for Ack.ack == -1{
+		sendSynAck(pro, seq,firstMsg.seq+1)
 
-	for connectionEstablished == false {
-		fmt.Println("Server, sends pac")
-		var temp2 = SendMessageRecieveAnswer(pro, Pac{temp.sec + 1, syn, temp.data}, syn+1, 400, &t)
-		fmt.Println("Server, recieve pac")
-		if temp2.ack == syn+1 && temp2.sec == temp.sec+1 {
-			fmt.Println("Server, sub activates")
-			connectionEstablished = true
-		}
+		go recieveAck(pro,seq,&Ack)
+		time.Sleep(300*time.Millisecond)
 	}
 
-	fmt.Println("Connection fully established")
+	fmt.Println("Server believes connection has been established")
+}
+
+func recieveAck(pro chan Pac, seq int, Ack *Pac){
+	fmt.Println("Server, recieveAck")
+	recieve := <- pro
+
+	if  recieve.ack == seq+1{
+		*Ack = recieve
+	}
+}
+
+func sendSynAck(pro chan Pac, seq int, ack int){
+	fmt.Println("Server, sendSynAck")
+	pro <- Pac{ack,seq}
+	time.Sleep(500 * time.Millisecond)
 }
 
 type Pac struct {
-	ack  int
-	sec  int
-	data string
+	ack int
+	seq int
 }
